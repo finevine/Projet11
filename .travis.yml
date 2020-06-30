@@ -13,4 +13,4 @@ services:
   - postgresql
 before_script:
   - psql -c "CREATE USER vft;"
-  - psql -c "CREATE DATABASE purbeurre;" -U purbeurre
+  - psql -c "CREATE DATABASE purbeurre;" -U vft
