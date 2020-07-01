@@ -136,17 +136,25 @@ LOGGING = {
 
 DEBUG_PROPAGATE_EXCEPTIONS = True
 
-# Database in local
-DATABASES = {
+if os.environ.get('TRAVIS'):
+    DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'purbeurre',
-        'USER': 'vft',
-        'PASSWORD': '',
-        'HOST': '',
-        'PORT': '5432',
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': 'mydatabase'
     }
 }
+else :
+    # Database in local
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'purbeurre',
+            'USER': 'vft',
+            'PASSWORD': '',
+            'HOST': '',
+            'PORT': '5432',
+        }
+    }
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
