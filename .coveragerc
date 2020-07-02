@@ -1,13 +1,6 @@
 
 # .coveragerc to control coverage.py
 [run]
-include =
-    account/views.py
-    pages/views.py
-    products/models.py
-    products/views.py
-    */init_db.py
-    */clean_db.py
 omit =
     */environment/*
     */migrations/*
@@ -15,6 +8,7 @@ omit =
     */asgi.py
     */wsgi.py
     */tests*
+    /Users/vft/.local/share/virtualenvs/*
 
 branch = False
 

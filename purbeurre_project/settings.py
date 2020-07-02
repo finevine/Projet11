@@ -138,12 +138,12 @@ DEBUG_PROPAGATE_EXCEPTIONS = True
 
 if os.environ.get('TRAVIS'):
     DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': 'mydatabase'
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': 'mydatabase'
+        }
     }
-}
-else :
+else:
     # Database in local
     DATABASES = {
         'default': {
