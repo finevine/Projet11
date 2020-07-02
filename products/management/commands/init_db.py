@@ -4,7 +4,7 @@ import django.core.exceptions as exceptions
 from django.db import IntegrityError
 from json import load
 from django.core.management.base import BaseCommand
-from products.models import Product, Category
+from products.models import Product, Category, ProductCategories
 
 API_URL = 'https://fr-en.openfoodfacts.org/cgi/search.pl'
 SEARCH_HEADER = {
@@ -43,7 +43,7 @@ class Command(BaseCommand):
         for category in categories:
             if category and category_names.get(category, ''):
                 try:
-                    category_DB, created = Category.objects.get_or_create(
+                    category_DB, created = Category.objects.bulk_create(
                         id=category,
                         defaults={
                             "id": category,
@@ -65,7 +65,7 @@ class Command(BaseCommand):
         # If product has nutritiongrade
         if product.get("nutriscore_grade"):
             code_to_store = int(product["code"])
-            product_DB, created = Product.objects.get_or_create(
+            product_DB, created = Product.objects.bulk_create(
                 code=code_to_store,
                 defaults={
                     "code": code_to_store,
@@ -123,7 +123,11 @@ class Command(BaseCommand):
                         categories_DB = self.create_categories_in_DB(
                             categories, category_names)
                         # add to product :
-                        product_DB.categories.set(categories_DB)
+                        for category_DB in categories_DB:
+                            ProductCategories.objects.bulk_create(
+                                product=product_DB,
+                                category = category_DB
+                            )
                         count += len(categories_DB)
 
                     try:

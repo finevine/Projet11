@@ -51,7 +51,8 @@ class Product(models.Model):
     categories = models.ManyToManyField(
         Category,
         related_name="products",
-        verbose_name="Catégorie")
+        verbose_name="Catégorie",
+        through='ProductCategories')
 
     compared_to_category = models.ForeignKey(
         Category,
@@ -69,6 +70,14 @@ class Product(models.Model):
     def save(self, *args, **kwargs):
         self.slug = slugify(self.name)[:50] + '-' + str(self.code)
         super().save(*args, **kwargs)
+
+
+class ProductCategories(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    category = models.ForeignKey(
+        Category,
+        on_delete=models.CASCADE,
+        related_name='associated_products')
 
 
 class Favourite(models.Model):
