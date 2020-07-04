@@ -169,16 +169,14 @@ class TestCompare(TestCase):
             prod = Product.objects.create(
                 name="prod"+str(i),
                 code=str(i),
-                nutritionGrade='a',
-                compared_to_category=cls.test_category)
+                nutritionGrade='a')
             prod.categories.add(cls.test_category)
 
         # create one unhealthy product to check filtering
         cls.bad_prod = Product.objects.create(
                 name="lastprod",
                 code='67890',
-                nutritionGrade='e',
-                compared_to_category=cls.test_category)
+                nutritionGrade='e')
         cls.bad_prod.categories.add(cls.test_category)
         cls.prod1 = Product.objects.get(code=1)
 
