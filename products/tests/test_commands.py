@@ -3,7 +3,7 @@ from json import load
 from unittest.mock import patch
 from django.test import TestCase
 from django.contrib.auth.models import User
-from products.models import Product, Category, Favourite
+from products.models import Product, Category, Favourite, ProductCategories
 from django.core.management import call_command
 from .mock_off_small import MOCK_REQUEST
 from .mock_off_nutella import NUTELLA
@@ -15,8 +15,6 @@ class TestInitDB(TestCase):
     def test_init_db(self, mock_request):
         # replace json by a small mock openff request with only 3 product
         mock_request.return_value.json.return_value = MOCK_REQUEST
-        # import pdb
-        # pdb.set_trace()
         call_command('init_db')
         # check only 2 products are saved :
         self.assertEquals(Product.objects.all().count(), 3)
@@ -26,8 +24,12 @@ class TestInitDB(TestCase):
             eau_de_source.name,
             "Eau de source")
 
+        # import pdb
+        # pdb.set_trace()
+        category_to_compare = ProductCategories.objects.get(
+            product=eau_de_source, to_compare=True).category
         self.assertEquals(
-            eau_de_source.compared_to_category.id,
+            category_to_compare.id,
             "en:unsweetened-beverages")
 
         # test the manytomanyfield is used well
@@ -35,9 +37,9 @@ class TestInitDB(TestCase):
             code=3274080005003).categories.all()
         water_cat = MOCK_REQUEST['products'][1]["categories_tags"]
         # Compare categories of product 1 in json and product 3274080005003
-        self.assertListEqual(
-            [cat.id for cat in eau_de_source.categories.all()],
-            ["en:beverages", "en:waters", "en:spring-waters"]
+        self.assertSetEqual(
+            set([cat.id for cat in eau_de_source.categories.all()]),
+            set(["en:beverages", "en:waters", "en:spring-waters", 'en:unsweetened-beverages'])
         )
         # Check that product without nutritionscore is not saved
         self.assertFalse(Product.objects.filter(code=123456781).exists())

@@ -1,5 +1,6 @@
 import requests
 import os
+import json
 from json import load
 from django.core.management.base import BaseCommand
 from products.models import Product, Category, ProductCategories
@@ -30,10 +31,24 @@ class Command(BaseCommand):
             headers=SEARCH_HEADER)
         # Output of request as a json file
         req_output = req.json()
+
         # Get results
         return req_output["products"]
 
-    def list_categories_to_create(self, categories, cat_names, cat_res):
+    def remove_duplic_dicts(self, l):
+        list_of_strings = [
+            json.dumps(d, sort_keys=True)
+            for d in l
+        ]
+
+        list_of_strings = set(list_of_strings)
+
+        return [
+            json.loads(s)
+            for s in list_of_strings
+        ]
+
+    def list_categories_to_create(self, categories, cat_names, cat_res=[]):
         ''' from a list of categories id, return list of categories
         to bulk_create
         categories (list of strings)
@@ -50,9 +65,9 @@ class Command(BaseCommand):
                 else:
                     cat_res.append(category_to_save)
 
-        return cat_res
+        return self.remove_duplic_dicts(cat_res)
 
-    def list_product_to_create(self, product):
+    def dic_product_to_create(self, product):
         '''return product in DB created if nutriscore_grade else None'''
         sugar = product["nutriments"].get("sugars_100g", 0)
         satFat = product["nutriments"].get("saturated-fat_100g", 0)
@@ -77,9 +92,9 @@ class Command(BaseCommand):
                 "salt": salt,
                 "fat": fat,
             }
-            return product_dic
         else:
-            return None
+            raise Exception('NoProduct')
+        return product_dic
 
     def handle(self, *args, **options):
         count = 0
@@ -93,59 +108,74 @@ class Command(BaseCommand):
         # pages of openFoodFacts request
         broken = False
 
-        prods_to_create, cats_to_create, prodcat_to_create = [], [], []
+        products_to_create, categories_to_create, prodcat_to_create = [], [], []
+        asso_table = {}
 
         for page in range(1, 18):
             if broken:
                 break
             print(f'page {page} ({count} save in DB)')
             products = self.get_products(page)
+
             for product in products:
                 # limit to products (Heroku_db < 10000 rows)
                 if count >= 9000:
                     broken = True
                     break
                     print(f'page {page} ({count} save in DB)')
+                try:
+                    product_to_create = self.dic_product_to_create(product)
+                    # concatenate product to bulk_create
+                    products_to_create.append(product_to_create)
+                    count += 1
 
-                product_to_create = self.list_product_to_create(product)
-                count += 1
+                    # categories of the product
+                    categories = product.get('categories_tags', [])[:3]
+                    compared_to_category = product.get('compared_to_category')
+                    if compared_to_category not in categories:
+                        categories.append(compared_to_category)
+                    categories_to_create += categories
 
-                # categories of the product
-                categories = product.get('categories_tags', [])[:3]
-
-                if categories:
-                    categories_to_create = self.list_categories_to_create(
-                        categories, category_names, [])
-                    # add to product :
-                    for category in categories_to_create:
-                        compare = (
-                            product.get('compared_to_category') == category.get('id')
+                    # asso table
+                    asso_table[product_to_create['code']] = [
+                        (
+                            category,
+                            product.get('compared_to_category') == category
                         )
+                        for category in categories
+                    ]
 
-                        # concatenate prodcat to_bulk_create
-                        prodcat_to_create.append(
-                            {
-                                "product": product.get('code'),
-                                "category": category.get('id'),
-                                "to_compare": compare,
-                            }
-                        )
 
-                    count += len(categories_to_create)
-                    # concatenate categories to bulk_create
-                    cats_to_create += categories_to_create
+                    count += len(categories)
 
-                # concatenate product to bulk_create
-                if product_to_create not in prods_to_create:
-                    prods_to_create.append(product_to_create)
+                except Exception:
+                    pass
+
+        categories_to_create = self.list_categories_to_create(
+            categories_to_create, category_names
+        )
 
         Product.objects.bulk_create(
-            [Product(**prod) for prod in prods_to_create]
+            [Product(**prod) for prod in products_to_create],
+            ignore_conflicts=True
             )
 
         Category.objects.bulk_create(
-            [Category(**cat) for cat in cats_to_create]
+            [Category(**cat) for cat in categories_to_create],
+            ignore_conflicts=True
             )
-        ProductCategories.objects.bulk_create(
-            [ProductCategories(**prodcat) for prodcat in prodcat_to_create]
-            )
+        # import pdb
+        # pdb.set_trace()
+        for code, list_of_cats in asso_table.items():
+            for cat, compare in list_of_cats:
+                # pdb.set_trace()
+                product = Product.objects.get(code=code)
+                category = Category.objects.get(id=cat)
+                prodcat_to_create.append(
+                    ProductCategories(
+                        product=product,
+                        category=category,
+                        to_compare=compare
+                    )
+                )
+        ProductCategories.objects.bulk_create(prodcat_to_create)

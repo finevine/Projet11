@@ -28,7 +28,7 @@ class Category(models.Model):
 class Product(models.Model):
     '''
     code, name, nutritionGrade, image (url),
-    fat, satFat, sugar, salt, compared_to_category
+    fat, satFat, sugar, salt
     '''
 
     objects = managers.ProductManager()
@@ -73,6 +73,9 @@ class ProductCategories(models.Model):
         on_delete=models.CASCADE,
         related_name='associated_products')
     to_compare = models.BooleanField(null=True)
+
+    def __str__(self):
+        return f'{self.product.code}, {self.category.id}, {self.to_compare}'
 
 
 class Favourite(models.Model):
