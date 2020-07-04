@@ -54,12 +54,6 @@ class Product(models.Model):
         verbose_name="Catégorie",
         through='ProductCategories')
 
-    compared_to_category = models.ForeignKey(
-        Category,
-        on_delete=models.PROTECT,
-        null=True
-    )
-
     class Meta:
         verbose_name = "Produit"
         # ordering = ['category__id']
@@ -78,6 +72,7 @@ class ProductCategories(models.Model):
         Category,
         on_delete=models.CASCADE,
         related_name='associated_products')
+    to_compare = models.BooleanField(null=True)
 
 
 class Favourite(models.Model):

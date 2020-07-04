@@ -1,7 +1,5 @@
 import requests
 import os
-import django.core.exceptions as exceptions
-from django.db import IntegrityError
 from json import load
 from django.core.management.base import BaseCommand
 from products.models import Product, Category, ProductCategories
@@ -35,27 +33,26 @@ class Command(BaseCommand):
         # Get results
         return req_output["products"]
 
-    def create_categories_in_DB(self, categories, category_names):
-        ''' from a list of categories id, return list of created object categories
+    def list_categories_to_create(self, categories, cat_names, cat_res):
+        ''' from a list of categories id, return list of categories
+        to bulk_create
         categories (list of strings)
-        category_names (dict)'''
-        categories_res = []
+        cat_names (dict)'''
         for category in categories:
-            if category and category_names.get(category, ''):
-                try:
-                    category_DB, created = Category.objects.bulk_create(
-                        id=category,
-                        defaults={
-                            "id": category,
-                            "name": category_names.get(category)
-                        })
-                    categories_res.append(category_DB)
-                except IntegrityError:
+            if category and cat_names.get(category, ''):
+                category_to_save = {
+                    "id": category,
+                    "name": cat_names.get(category)
+                    }
+                # for integrity reasons
+                if category_to_save in cat_res:
                     pass
+                else:
+                    cat_res.append(category_to_save)
 
-        return categories_res
+        return cat_res
 
-    def create_product_in_DB(self, product):
+    def list_product_to_create(self, product):
         '''return product in DB created if nutriscore_grade else None'''
         sugar = product["nutriments"].get("sugars_100g", 0)
         satFat = product["nutriments"].get("saturated-fat_100g", 0)
@@ -65,25 +62,22 @@ class Command(BaseCommand):
         # If product has nutritiongrade
         if product.get("nutriscore_grade"):
             code_to_store = int(product["code"])
-            product_DB, created = Product.objects.bulk_create(
-                code=code_to_store,
-                defaults={
-                    "code": code_to_store,
-                    "name": product.get(
-                        "product_name", product.get("product_name_fr")),
-                    "nutritionGrade": product.get("nutriscore_grade"),
-                    "image": product.get(
-                        "selected_images", {}).get(
-                            "front", {}).get(
-                                "display", {}).get(
-                                    "fr"),
-                    "sugar": sugar,
-                    "satFat": satFat,
-                    "salt": salt,
-                    "fat": fat,
-                },
-            )
-            return product_DB
+            product_dic = {
+                "code": code_to_store,
+                "name": product.get(
+                    "product_name", product.get("product_name_fr")),
+                "nutritionGrade": product.get("nutriscore_grade"),
+                "image": product.get(
+                    "selected_images", {}).get(
+                        "front", {}).get(
+                            "display", {}).get(
+                                "fr"),
+                "sugar": sugar,
+                "satFat": satFat,
+                "salt": salt,
+                "fat": fat,
+            }
+            return product_dic
         else:
             return None
 
@@ -98,6 +92,9 @@ class Command(BaseCommand):
 
         # pages of openFoodFacts request
         broken = False
+
+        prods_to_create, cats_to_create, prodcat_to_create = [], [], []
+
         for page in range(1, 18):
             if broken:
                 break
@@ -110,33 +107,45 @@ class Command(BaseCommand):
                     break
                     print(f'page {page} ({count} save in DB)')
 
-                product_DB = self.create_product_in_DB(product)
+                product_to_create = self.list_product_to_create(product)
                 count += 1
 
-                # assign product 'compared_to_category' attribute
-                if product_DB:
-                    # if False:
-                    # categories of the product
-                    categories = product.get('categories_tags', [])[:3]
-                    # categories createdin DB
-                    if categories:
-                        categories_DB = self.create_categories_in_DB(
-                            categories, category_names)
-                        # add to product :
-                        for category_DB in categories_DB:
-                            ProductCategories.objects.bulk_create(
-                                product=product_DB,
-                                category = category_DB
-                            )
-                        count += len(categories_DB)
+                # categories of the product
+                categories = product.get('categories_tags', [])[:3]
 
-                    try:
-                        category_to_compare = self.create_categories_in_DB(
-                            [product.get("compared_to_category")],
-                            category_names)
-                        count += 1
-                        product_DB.compared_to_category = category_to_compare[0]
-                        product_DB.save()
-                    except (exceptions.ObjectDoesNotExist, IndexError):
-                        product_DB.compared_to_category = None
-                        product_DB.save()
+                if categories:
+                    categories_to_create = self.list_categories_to_create(
+                        categories, category_names, [])
+                    # add to product :
+                    for category in categories_to_create:
+                        compare = (
+                            product.get('compared_to_category') == category.get('id')
+                        )
+
+                        # concatenate prodcat to_bulk_create
+                        prodcat_to_create.append(
+                            {
+                                "product": product.get('code'),
+                                "category": category.get('id'),
+                                "to_compare": compare,
+                            }
+                        )
+
+                    count += len(categories_to_create)
+                    # concatenate categories to bulk_create
+                    cats_to_create += categories_to_create
+
+                # concatenate product to bulk_create
+                if product_to_create not in prods_to_create:
+                    prods_to_create.append(product_to_create)
+
+        Product.objects.bulk_create(
+            [Product(**prod) for prod in prods_to_create]
+            )
+
+        Category.objects.bulk_create(
+            [Category(**cat) for cat in cats_to_create]
+            )
+        ProductCategories.objects.bulk_create(
+            [ProductCategories(**prodcat) for prodcat in prodcat_to_create]
+            )
