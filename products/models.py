@@ -10,9 +10,9 @@ class Category(models.Model):
     '''
     id = models.CharField(max_length=100, primary_key=True, blank=False)
     name = models.CharField(
-        verbose_name="Category name", max_length=400, unique=False)
-    slug = models.SlugField(
-        max_length=151, unique=True, editable=False, null=True)
+        verbose_name="Category name", max_length=400, unique=False, null=True)
+    # slug = models.SlugField(
+    #     max_length=151, unique=True, editable=False, null=True)
 
     class Meta:
         verbose_name = "Catégorie"
@@ -20,9 +20,9 @@ class Category(models.Model):
     def __str__(self):
         return self.id
 
-    def save(self, *args, **kwargs):
-        self.slug = slugify(self.name)[:50] + '-' + str(self.id)
-        super(Category, self).save(*args, **kwargs)
+    # def save(self, *args, **kwargs):
+    #     self.slug = slugify(self.name)[:50] + '-' + str(self.id)
+    #     super(Category, self).save(*args, **kwargs)
 
 
 class Product(models.Model):
