@@ -37,15 +37,9 @@ class TestInitDB(TestCase):
             code=3274080005003).categories.all()
         water_cat = MOCK_REQUEST['products'][1]["categories_tags"]
         # Compare categories of product 1 in json and product 3274080005003
-<<<<<<< HEAD
-        self.assertListEqual(
-            [cat.id for cat in eau_de_source.categories.all()],
-            ["en:beverages", "en:spring-waters", "en:waters"]
-=======
         self.assertSetEqual(
             set([cat.id for cat in eau_de_source.categories.all()]),
             set(["en:waters", "en:spring-waters", 'en:unsweetened-beverages'])
->>>>>>> bulk_create
         )
         # Check that product without nutritionscore is not saved
         self.assertFalse(Product.objects.filter(code=123456781).exists())
