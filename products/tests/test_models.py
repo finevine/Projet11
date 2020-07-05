@@ -22,17 +22,14 @@ class TestProductsModels(TestCase):
             name="Good Coca",
             code=999999,
             fat=12.34,
-            nutritionGrade="a",
-            compared_to_category=cls.cat1)
+            nutritionGrade="a")
         cls.longprod = Product.objects.create(
             name='a'*100,
-            code=456,
-            compared_to_category=cls.cat1)
+            code=456)
         cls.badprod = Product.objects.create(
             name="Bad Coca",
             code=000000,
-            nutritionGrade="e",
-            compared_to_category=cls.cat1)
+            nutritionGrade="e")
 
     def setUp(self):
         pass

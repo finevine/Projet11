@@ -1,10 +1,10 @@
 import requests
 import os
-import django.core.exceptions as exceptions
-from django.db import IntegrityError
+import json
 from json import load
 from django.core.management.base import BaseCommand
-from products.models import Product, Category
+from django.core.exceptions import ObjectDoesNotExist
+from products.models import Product, Category, ProductCategories
 
 API_URL = 'https://fr-en.openfoodfacts.org/cgi/search.pl'
 SEARCH_HEADER = {
@@ -32,30 +32,43 @@ class Command(BaseCommand):
             headers=SEARCH_HEADER)
         # Output of request as a json file
         req_output = req.json()
+
         # Get results
         return req_output["products"]
 
-    def create_categories_in_DB(self, categories, category_names):
-        ''' from a list of categories id, return list of created object categories
+    def remove_duplic_dicts(self, l):
+        list_of_strings = [
+            json.dumps(d, sort_keys=True)
+            for d in l
+        ]
+
+        list_of_strings = set(list_of_strings)
+
+        return [
+            json.loads(s)
+            for s in list_of_strings
+        ]
+
+    def list_categories_to_create(self, categories, cat_names, cat_res=[]):
+        ''' from a list of categories id, return list of categories
+        to bulk_create
         categories (list of strings)
-        category_names (dict)'''
-        categories_res = []
+        cat_names (dict)'''
         for category in categories:
-            if category and category_names.get(category, ''):
-                try:
-                    category_DB, created = Category.objects.get_or_create(
-                        id=category,
-                        defaults={
-                            "id": category,
-                            "name": category_names.get(category)
-                        })
-                    categories_res.append(category_DB)
-                except IntegrityError:
-                    pass
+            # if category and cat_names.get(category, ''):
+            category_to_save = {
+                "id": category,
+                "name": cat_names.get(category)
+                }
+            # for integrity reasons
+            if category_to_save in cat_res:
+                pass
+            else:
+                cat_res.append(category_to_save)
 
-        return categories_res
+        return self.remove_duplic_dicts(cat_res)
 
-    def create_product_in_DB(self, product):
+    def dic_product_to_create(self, product):
         '''return product in DB created if nutriscore_grade else None'''
         sugar = product["nutriments"].get("sugars_100g", 0)
         satFat = product["nutriments"].get("saturated-fat_100g", 0)
@@ -65,27 +78,24 @@ class Command(BaseCommand):
         # If product has nutritiongrade
         if product.get("nutriscore_grade"):
             code_to_store = int(product["code"])
-            product_DB, created = Product.objects.get_or_create(
-                code=code_to_store,
-                defaults={
-                    "code": code_to_store,
-                    "name": product.get(
-                        "product_name", product.get("product_name_fr")),
-                    "nutritionGrade": product.get("nutriscore_grade"),
-                    "image": product.get(
-                        "selected_images", {}).get(
-                            "front", {}).get(
-                                "display", {}).get(
-                                    "fr"),
-                    "sugar": sugar,
-                    "satFat": satFat,
-                    "salt": salt,
-                    "fat": fat,
-                },
-            )
-            return product_DB
+            product_dic = {
+                "code": code_to_store,
+                "name": product.get(
+                    "product_name", product.get("product_name_fr")),
+                "nutritionGrade": product.get("nutriscore_grade"),
+                "image": product.get(
+                    "selected_images", {}).get(
+                        "front", {}).get(
+                            "display", {}).get(
+                                "fr"),
+                "sugar": sugar,
+                "satFat": satFat,
+                "salt": salt,
+                "fat": fat,
+            }
         else:
-            return None
+            raise Exception('NoProduct')
+        return product_dic
 
     def handle(self, *args, **options):
         count = 0
@@ -98,41 +108,78 @@ class Command(BaseCommand):
 
         # pages of openFoodFacts request
         broken = False
+
+        products_to_create, cat_id_to_create, prodcat_to_create = [], [], []
+        asso_table = {}
+
         for page in range(1, 18):
             if broken:
                 break
             print(f'page {page} ({count} save in DB)')
             products = self.get_products(page)
+
             for product in products:
                 # limit to products (Heroku_db < 10000 rows)
                 if count >= 9000:
                     broken = True
                     break
                     print(f'page {page} ({count} save in DB)')
+                try:
+                    product_to_create = self.dic_product_to_create(product)
+                    # concatenate product to bulk_create
+                    products_to_create.append(product_to_create)
+                    count += 1
 
-                product_DB = self.create_product_in_DB(product)
-                count += 1
-
-                # assign product 'compared_to_category' attribute
-                if product_DB:
-                    # if False:
                     # categories of the product
-                    categories = product.get('categories_tags', [])[:3]
-                    # categories createdin DB
-                    if categories:
-                        categories_DB = self.create_categories_in_DB(
-                            categories, category_names)
-                        # add to product :
-                        product_DB.categories.set(categories_DB)
-                        count += len(categories_DB)
+                    categories_id = product.get('categories_tags', [])[-3:]
 
-                    try:
-                        category_to_compare = self.create_categories_in_DB(
-                            [product.get("compared_to_category")],
-                            category_names)
-                        count += 1
-                        product_DB.compared_to_category = category_to_compare[0]
-                        product_DB.save()
-                    except (exceptions.ObjectDoesNotExist, IndexError):
-                        product_DB.compared_to_category = None
-                        product_DB.save()
+                    # compared_to_category if not in categories_id add it
+                    compared_to_category = product.get('compared_to_category')
+                    if not (compared_to_category in categories_id):
+                        categories_id.append(compared_to_category)
+                    # add those categories_id to global list to bulk create
+                    cat_id_to_create += categories_id
+
+                    # asso table
+                    asso_table[product_to_create['code']] = [
+                        (
+                            category,
+                            product.get('compared_to_category') == category
+                        )
+                        for category in categories_id
+                    ]
+
+                    count += len(categories_id)
+
+                except Exception:
+                    pass
+
+        cat_id_to_create = self.list_categories_to_create(
+            cat_id_to_create, category_names
+        )
+
+        Product.objects.bulk_create(
+            [Product(**prod) for prod in products_to_create],
+            ignore_conflicts=True
+            )
+
+        Category.objects.bulk_create(
+            [Category(**cat) for cat in cat_id_to_create],
+            ignore_conflicts=True
+            )
+        for code, list_of_cats in asso_table.items():
+            for (cat, compare) in list_of_cats:
+                product = Product.objects.get(code=code)
+                try:
+                    category = Category.objects.get(id=cat)
+                    prodcat_to_create.append(
+                        ProductCategories(
+                            product=product,
+                            category=category,
+                            to_compare=compare
+                        )
+                    )
+                except ObjectDoesNotExist:
+                    pass
+
+        Product.categories.through.objects.bulk_create(prodcat_to_create)
