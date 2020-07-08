@@ -3,10 +3,10 @@ from json import load
 from unittest.mock import patch
 from django.test import TestCase
 from django.contrib.auth.models import User
-from products.models import Product, Category, Favourite, ProductCategories
+from products.models import Product, Category, Favourite
 from django.core.management import call_command
-from .mock_off_small import MOCK_REQUEST
-from .mock_off_nutella import NUTELLA
+from .mock_off_small import MOCK_OFF_SMALL
+from .mock_off_nutella import MOCK_OFF_NUTELLA
 
 
 class TestInitDB(TestCase):
@@ -14,7 +14,7 @@ class TestInitDB(TestCase):
     @patch('products.management.commands.init_db.requests.get')
     def test_init_db(self, mock_request):
         # replace json by a small mock openff request with only 3 product
-        mock_request.return_value.json.return_value = MOCK_REQUEST
+        mock_request.return_value.json.return_value = MOCK_OFF_SMALL
         # import pdb
         # pdb.set_trace()
         call_command('init_db')
@@ -22,24 +22,11 @@ class TestInitDB(TestCase):
         self.assertEquals(Product.objects.all().count(), 3)
         # water was in the set :
         eau_de_source = Product.objects.get(code=3274080005003)
-        self.assertEquals(
-            eau_de_source.name,
-            "Eau de source")
-
-        category_to_compare = ProductCategories.objects.get(
-            product=eau_de_source, to_compare=True).category
-        self.assertEquals(
-            category_to_compare.id,
-            "en:unsweetened-beverages")
-
-        # test the manytomanyfield is used well
-        mock_categories = Product.objects.get(
-            code=3274080005003).categories.all()
-        water_cat = MOCK_REQUEST['products'][1]["categories_tags"]
+        self.assertEquals(eau_de_source.name, "Eau de source")
         # Compare categories of product 1 in json and product 3274080005003
         self.assertSetEqual(
-            set([cat.id for cat in eau_de_source.categories.all()]),
-            set(["en:waters", "en:spring-waters", 'en:unsweetened-beverages'])
+            set([cat.name for cat in eau_de_source.categories.all()]),
+            set(["Getränke", "Wasser", "Quellwasser"])
         )
         # Check that product without nutritionscore is not saved
         self.assertFalse(Product.objects.filter(code=123456781).exists())
@@ -50,29 +37,7 @@ class TestInitDuplicates(TestCase):
     @patch('products.management.commands.init_db.requests.get')
     def test_init_nutella(self, mock_request):
         # replace json by a small mock openff request with only 3 product
-        mock_request.return_value.json.return_value = NUTELLA
-        call_command('init_db')
-        nutella = Product.objects.get(code=3017620422003)
-        self.assertEquals(nutella.name, "Nutella")
-        self.assertFalse(
-            Product.objects.filter(name="Nutella doublon").exists())
-        self.assertEquals(len(list(
-            Product.objects.filter(code=3017620422003).order_by('code')
-            )), 1)
-
-
-class TestRealOFFPage(TestCase):
-
-    @patch('products.management.commands.init_db.requests.get')
-    def test_init_nutella(self, mock_request):
-        # Open json of all categories to associate id & names
-        with open(
-            os.path.join(
-                os.path.dirname(__file__),
-                "mock_off_real.json"), 'r') as json_file:
-            REAL_JSON = load(json_file)
-        # replace json by a big mock openff request
-        mock_request.return_value.json.return_value = REAL_JSON
+        mock_request.return_value.json.return_value = MOCK_OFF_NUTELLA
         call_command('init_db')
         nutella = Product.objects.get(code=3017620422003)
         self.assertEquals(nutella.name, "Nutella")
@@ -91,7 +56,7 @@ class TestCleanDB(TestCase):
             'user1@email.com',
             'user1password')
         products = [Product.objects.create(code=str(i)) for i in range(2)]
-        Category.objects.create(id="fr:fruits")
+        Category.objects.create(name="Fruits frais")
         Favourite.objects.create(
             healthy_product=products[0],
             unhealthy_product=products[1],

@@ -1,10 +1,6 @@
 import requests
-import os
-import json
-from json import load
 from django.core.management.base import BaseCommand
-from django.core.exceptions import ObjectDoesNotExist
-from products.models import Product, Category, ProductCategories
+from products.models import Product, Category
 
 API_URL = 'https://fr-en.openfoodfacts.org/cgi/search.pl'
 SEARCH_HEADER = {
@@ -36,83 +32,34 @@ class Command(BaseCommand):
         # Get results
         return req_output["products"]
 
-    def remove_duplic_dicts(self, l):
-        list_of_strings = [
-            json.dumps(d, sort_keys=True)
-            for d in l
-        ]
-
-        list_of_strings = set(list_of_strings)
-
-        return [
-            json.loads(s)
-            for s in list_of_strings
-        ]
-
-    def list_categories_to_create(self, categories, cat_names, cat_res=[]):
-        ''' from a list of categories id, return list of categories
-        to bulk_create
-        categories (list of strings)
-        cat_names (dict)'''
-        for category in categories:
-            # if category and cat_names.get(category, ''):
-            category_to_save = {
-                "id": category,
-                "name": cat_names.get(category)
-                }
-            # for integrity reasons
-            if category_to_save in cat_res:
-                pass
-            else:
-                cat_res.append(category_to_save)
-
-        return self.remove_duplic_dicts(cat_res)
-
-    def dic_product_to_create(self, product):
+    def create_product(self, product):
         '''return product in DB created if nutriscore_grade else None'''
-        sugar = product["nutriments"].get("sugars_100g", 0)
-        satFat = product["nutriments"].get("saturated-fat_100g", 0)
-        salt = product["nutriments"].get("salt_100g", 0)
-        fat = product["nutriments"].get("fat_100g", 0)
+        product_to_create = Product(
+            code=int(product.get("code", 0)),
+            name=product.get(
+                "product_name", product.get("product_name_fr")),
+            nutritionGrade=product.get("nutriscore_grade", ''),
+            image=product.get(
+                "selected_images", {}).get(
+                    "front", {}).get(
+                        "display", {}).get(
+                            "fr"),
+            sugar=product["nutriments"].get("sugars_100g", 0),
+            satFat=product["nutriments"].get("saturated-fat_100g", 0),
+            salt=product["nutriments"].get("salt_100g", 0),
+            fat=product["nutriments"].get("fat_100g", 0),
+        )
 
-        # If product has nutritiongrade
-        if product.get("nutriscore_grade"):
-            code_to_store = int(product["code"])
-            product_dic = {
-                "code": code_to_store,
-                "name": product.get(
-                    "product_name", product.get("product_name_fr")),
-                "nutritionGrade": product.get("nutriscore_grade"),
-                "image": product.get(
-                    "selected_images", {}).get(
-                        "front", {}).get(
-                            "display", {}).get(
-                                "fr"),
-                "sugar": sugar,
-                "satFat": satFat,
-                "salt": salt,
-                "fat": fat,
-            }
-        else:
-            raise Exception('NoProduct')
-        return product_dic
+        return product_to_create
 
     def handle(self, *args, **options):
         count = 0
-        # Open json of all categories to associate id & names
-        with open(
-            os.path.join(
-                os.path.dirname(__file__),
-                "categories_cleaned.json"), 'r') as json_file:
-            category_names = load(json_file)
+        broken = False
+        association = []
+        through_to_create = []
 
         # pages of openFoodFacts request
-        broken = False
-
-        products_to_create, cat_id_to_create, prodcat_to_create = [], [], []
-        asso_table = {}
-
-        for page in range(1, 18):
+        for page in range(1, 9000 // 500):
             if broken:
                 break
             print(f'page {page} ({count} save in DB)')
@@ -123,63 +70,31 @@ class Command(BaseCommand):
                 if count >= 9000:
                     broken = True
                     break
-                    print(f'page {page} ({count} save in DB)')
-                try:
-                    product_to_create = self.dic_product_to_create(product)
-                    # concatenate product to bulk_create
-                    products_to_create.append(product_to_create)
-                    count += 1
+                product_to_create = self.create_product(product)
+                count += 1
 
-                    # categories of the product
-                    categories_id = product.get('categories_tags', [])[-3:]
-
-                    # compared_to_category if not in categories_id add it
-                    compared_to_category = product.get('compared_to_category')
-                    if not (compared_to_category in categories_id):
-                        categories_id.append(compared_to_category)
-                    # add those categories_id to global list to bulk create
-                    cat_id_to_create += categories_id
-
-                    # asso table
-                    asso_table[product_to_create['code']] = [
-                        (
-                            category,
-                            product.get('compared_to_category') == category
-                        )
-                        for category in categories_id
-                    ]
-
-                    count += len(categories_id)
-
-                except Exception:
-                    pass
-
-        cat_id_to_create = self.list_categories_to_create(
-            cat_id_to_create, category_names
-        )
-
-        Product.objects.bulk_create(
-            [Product(**prod) for prod in products_to_create],
-            ignore_conflicts=True
-            )
-
-        Category.objects.bulk_create(
-            [Category(**cat) for cat in cat_id_to_create],
-            ignore_conflicts=True
-            )
-        for code, list_of_cats in asso_table.items():
-            for (cat, compare) in list_of_cats:
-                product = Product.objects.get(code=code)
-                try:
-                    category = Category.objects.get(id=cat)
-                    prodcat_to_create.append(
-                        ProductCategories(
-                            product=product,
-                            category=category,
-                            to_compare=compare
-                        )
+                if product_to_create.nutritionGrade:
+                    # 3 first categories of the product
+                    categories_names = product.get('categories', '').split(',')[:3]
+                    # create association
+                    association.append(
+                        (product_to_create,
+                        [Category(name=name) for name in categories_names])
                     )
-                except ObjectDoesNotExist:
-                    pass
+                    count += len(categories_names)
+        
+        product_to_create, categories_to_create = zip(*association)
+        flat_cat = [val for sublist in categories_to_create for val in sublist]
+        Product.objects.bulk_create(product_to_create, ignore_conflicts=True)
+        Category.objects.bulk_create(flat_cat, ignore_conflicts=True)
 
-        Product.categories.through.objects.bulk_create(prodcat_to_create)
+        for product, category_names in association:
+            for category_name in category_names:
+                prodcat_to_create = Product.categories.through(
+                    product_id=product.code,
+                    category_id=Category.objects.get(name=category_name).id
+                )
+                through_to_create.append(prodcat_to_create)
+        Product.categories.through.objects.bulk_create(
+            through_to_create,
+            ignore_conflicts=True)

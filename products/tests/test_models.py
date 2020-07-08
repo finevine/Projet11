@@ -10,11 +10,11 @@ class TestProductsModels(TestCase):
         ''' Create product and categories '''
         # Categories
         cls.cat1 = Category.objects.create(
-            id="cat1",
+            id=1,
             name="Test Category 1",
         )
         cls.cat2 = Category.objects.create(
-            id="cat2",
+            id=2,
             name="Test Category 2",
         )
         # Products
@@ -75,14 +75,15 @@ class TestProductsModels(TestCase):
 
     def test_str(self):
         self.assertEqual(str(self.goodprod), "Good Coca")
-        self.assertEqual(str(self.cat1), "cat1")
+        self.assertEqual(self.cat1.id, 1)
 
     def test_product_category_assignment(self):
         self.goodprod.categories.add(self.cat1)
         self.goodprod.categories.add(self.cat2)
-        self.assertQuerysetEqual(
-            self.goodprod.categories.all(),
-            [repr(self.cat1), repr(self.cat2)], ordered=False)
+        self.assertSetEqual(
+            set(self.goodprod.categories.all()),
+            set([self.cat1, self.cat2])
+        )
 
     def test_similar_method(self):
         self.goodprod.categories.add(self.cat1)

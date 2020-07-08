@@ -1,4 +1,4 @@
-NUTELLA = {
+MOCK_OFF_NUTELLA = {
     "products": [
         {
             "product_name":"Nutella",
@@ -12,6 +12,7 @@ NUTELLA = {
                 "en:chocolate-spreads",
                 "en:cocoa-and-hazelnuts-spreads"
             ],
+            "categories": "Petit-déjeuner,Pâte à tartiner",
             "nutriscore_grade": "e",
             "compared_to_category": "en:cocoa-and-hazelnuts-spreads",
             "nutriments": {

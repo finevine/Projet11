@@ -1,4 +1,4 @@
-MOCK_REQUEST = {
+MOCK_OFF_SMALL = {
     "products": [
         {
             "product_name":"Product without nutritionscore",
@@ -13,12 +13,12 @@ MOCK_REQUEST = {
                 "proteins_100g": 6.3,
                 "proteins": 6.3,
                 "fat": 30.9
-            }
+            },
+            "categories": "fake0, fake1, fake2",
         },
         {
-            "stores": "Carrefour,auchan,Leclerc",
-            "sortkey": 301591456287,
             "code": "3274080005003",
+            "categories": "Getränke,Wasser,Quellwasser,Ungezuckerte Getränke",
             "categories_tags": [
                 "en:beverages",
                 "en:waters",
@@ -5194,7 +5194,6 @@ MOCK_REQUEST = {
             "environment_impact_level_tags": [],
             "image_thumb_url": "https://static.openfoodfacts.org/images/products/327/408/000/5003/front_fr.535.100.jpg",
             "traces_hierarchy": [],
-            "categories": "Getränke,Wasser,Quellwasser,Ungezuckerte Getränke",
             "no_nutrition_data": "",
             "ingredients_debug": [
                 "Eau de source."

@@ -8,9 +8,8 @@ class Category(models.Model):
     '''
     name
     '''
-    id = models.CharField(max_length=100, primary_key=True, blank=False)
     name = models.CharField(
-        verbose_name="Category name", max_length=400, unique=False, null=True)
+        verbose_name="Category name", max_length=400, unique=True, null=True)
     # slug = models.SlugField(
     #     max_length=151, unique=True, editable=False, null=True)
 
@@ -18,7 +17,7 @@ class Category(models.Model):
         verbose_name = "Catégorie"
 
     def __str__(self):
-        return self.id
+        return (self.name)
 
     # def save(self, *args, **kwargs):
     #     self.slug = slugify(self.name)[:50] + '-' + str(self.id)
@@ -51,8 +50,7 @@ class Product(models.Model):
     categories = models.ManyToManyField(
         Category,
         related_name="products",
-        verbose_name="Catégorie",
-        through='ProductCategories')
+        verbose_name="Catégorie")
 
     class Meta:
         verbose_name = "Produit"
@@ -64,18 +62,6 @@ class Product(models.Model):
     def save(self, *args, **kwargs):
         self.slug = slugify(self.name)[:50] + '-' + str(self.code)
         super().save(*args, **kwargs)
-
-
-class ProductCategories(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    category = models.ForeignKey(
-        Category,
-        on_delete=models.CASCADE,
-        related_name='associated_products')
-    to_compare = models.BooleanField(null=True)
-
-    def __str__(self):
-        return f'{self.product.code}, {self.category.id}, {self.to_compare}'
 
 
 class Favourite(models.Model):

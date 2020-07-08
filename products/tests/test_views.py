@@ -27,8 +27,8 @@ class TestSaveDelete(TestCase):
     @classmethod  # <- setUpTestData must be a class method
     def setUpTestData(cls):
         # create one category for all products created
-        Category.objects.create(id="fruits:fr", name="Fruits frais")
-        cls.category = Category.objects.get(id="fruits:fr")
+        Category.objects.create(id=1, name="Fruits frais")
+        cls.category = Category.objects.get(id=1)
         # create 2 products
         for i in range(2):
             prod = Product.objects.create(
@@ -160,9 +160,9 @@ class TestCompare(TestCase):
     def setUpTestData(cls):
         # create one category for all products created
         Category.objects.create(
-            id="fruits:fr",
+            id=1,
             name="Fruits frais")
-        cls.test_category = Category.objects.get(id="fruits:fr")
+        cls.test_category = Category.objects.get(id=1)
 
         # create 15 products
         for i in range(15):
@@ -219,7 +219,7 @@ class TestCompare(TestCase):
 class TestDetail(TestCase):
 
     def test_ProductDetailView(self):
-        mock_category = Category.objects.create(id="fruits:fr", name="Fruits")
+        mock_category = Category.objects.create(id=1, name="Fruits")
         mock_product = Product(code='5', name='prod5')
         mock_category.save()
         mock_product.save()
