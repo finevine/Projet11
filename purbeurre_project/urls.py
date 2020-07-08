@@ -16,6 +16,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 from django.contrib.auth import views as auth_views
+from account.forms import AuthenticationFormByMail
 
 urlpatterns = [
     path('', include('pages.urls', namespace="pages")),
@@ -23,5 +24,10 @@ urlpatterns = [
     path('products/', include('products.urls', namespace="products")),
     path('account/', include('django.contrib.auth.urls')),
     path('account/', include('account.urls', namespace="account")),
-    path('account/profile/', auth_views.LoginView.as_view(template_name='account/index.html', extra_context={'title': 'Ahoy!', 'headerImg': 'header_contact.jpg'}), name='profile'),
+    path('account/profile/', auth_views.LoginView.as_view(
+        template_name='account/index.html',
+        extra_context={'title': 'Ahoy!', 'headerImg': 'header_contact.jpg'},
+        authentication_form=AuthenticationFormByMail
+        ),
+        name='profile'),
 ]
