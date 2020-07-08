@@ -20,18 +20,14 @@ class SignUpForm(UserCreationForm):
 
 
 class AuthenticationFormByMail(AuthenticationForm):
-    email = forms.EmailField(
-        label='Email',
-        widget=forms.TextInput(attrs={'autofocus': True})
-    )
+    email = forms.EmailField(required=True)
 
     class Meta:
+        model = User
         fields = ('email', 'password')
         labels = {
             'email': _("Adresse email"),
             'password': _("Mot de passe"),
-        }
-        help_texts = {
         }
 
     def clean(self):

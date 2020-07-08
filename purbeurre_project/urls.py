@@ -27,7 +27,7 @@ urlpatterns = [
     path('account/profile/', auth_views.LoginView.as_view(
         template_name='account/index.html',
         extra_context={'title': 'Ahoy!', 'headerImg': 'header_contact.jpg'},
-        authentication_form=AuthenticationFormByMail
+        authentication_form=AuthenticationFormByMail,
         ),
         name='profile'),
 ]
