@@ -1,5 +1,6 @@
 from django.urls import path
 from django.contrib.auth import views as auth_views
+from account.forms import AuthenticationFormByMail
 
 
 from . import views
@@ -8,4 +9,5 @@ app_name = 'account'
 urlpatterns = [
     path('profile/', views.index, name='profile'),
     path('signup/', views.signup, name='signup'),
+    path('login/', views.login, name='login'),
 ]
