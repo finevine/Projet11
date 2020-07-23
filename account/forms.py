@@ -21,32 +21,33 @@ class SignUpForm(UserCreationForm):
 
 class AuthenticationFormByMail(AuthenticationForm):
     '''Simple login form'''
+    username = forms.CharField(required=False)
     email = forms.EmailField(widget=forms.EmailInput(), required=True,)
     class Meta:
         model = User
         fields = ('email', 'password')
 
-    # class Meta:
-    #     model = User
-    #     fields = ('email', 'password')
-    #     labels = {
-    #         'email': _("Adresse email"),
-    #         'password': _("Mot de passe"),
-    #     }
+    class Meta:
+        model = User
+        fields = ('email', 'password')
+        labels = {
+            'email': _("Adresse email"),
+            'password': _("Mot de passe"),
+        }
 
     def clean(self):
         email = self.cleaned_data.get('email')
         password = self.cleaned_data.get('password')
 
-        if email is not None and password:
-            self.user_cache = EmailBackend.authenticate(email=email, password=password)
-            if self.user_cache is None:
-                raise forms.ValidationError(
-                    self.error_messages['invalid_login'],
-                    code='invalid_login',
-                    params={'username': self.username_field.verbose_name},
-                )
-            else:
-                self.confirm_login_allowed(self.user_cache)
+        # if email is not None and password:
+        #     self.user_cache = EmailBackend.authenticate(email=email, password=password)
+        #     if self.user_cache is None:
+        #         raise forms.ValidationError(
+        #             self.error_messages['invalid_login'],
+        #             code='invalid_login',
+        #             params={'username': self.username_field.verbose_name},
+        #         )
+        #     else:
+        #         self.confirm_login_allowed(self.user_cache)
 
         return self.cleaned_data
